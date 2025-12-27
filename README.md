@@ -188,12 +188,14 @@ inline std::string make_location_string(const std::source_location& loc = std::s
 ```
 And place it to `include/utils/LoggingUtils.h`.
 
-> If you're using CLion as an IDE, add file to `CMakeFiles.txt`:```cmake
+> If you're using CLion as an IDE, add file to `CMakeFiles.txt`:
+```cmake
 add_executable(${PROJECT_NAME}
 src/main.cpp
 include/utils/LoggingUtils.h
 )
-``` To allow CLion check it with static analyzer.
+``` 
+To allow CLion check it with static analyzer.
 
 When used in logs, `make_location_string` provides the most detailed indication of the call location, which is very useful for detecting errors.
 
@@ -209,7 +211,8 @@ Now we're able to start configuring our `main.cpp`.
 #include <uredis/RedisClusterClient.h>
 
 #include "utils/LoggingUtils.h"
-```> Don't worry about `RedisClusterClient`, it'll fallback to basic client if KeyDB (same as Redis) not in cluster mode.
+```
+> Don't worry about `RedisClusterClient`, it'll fallback to basic client if KeyDB (same as Redis) not in cluster mode.
 
 ### Configuring `ulog`
 ```cpp
@@ -235,10 +238,12 @@ int main() {
     return 0;
 }
 ```
+
 Let's clarify each parameter:
 - `trace_path`, `debug_path` etc. – log paths. `nullptr` means logs will be printed to stdout
 - `flush_interval_ns` – how often flushing coroutine will be woken up and flush queues.
 - `queue_capacity` – capacity of lock-free queue which is used as log storage by default. If capacity exceeded it'll fallback to queue with mutex. You can track fallback metrics like that:
+
 ```cpp
 if (auto* lg = usub::ulog::Logger::try_instance())
 {
@@ -246,12 +251,15 @@ if (auto* lg = usub::ulog::Logger::try_instance())
     ulog::info("logger overflows (mpmc full -> mutex fallback) = {}", overflows);
 }
 ```
+
 - `batch_size` – how many elements will be dequeued from storage (both lock-free and non-lock free queue) at once.
 - `enable_color_stdout` – responsible for colorful logs.
 - `json_mode` – ulog is able to flush logs as json, so they'll look like:
+
 ```json
 {"time":"2025-10-28 12:03:44.861","thread":3,"level":"I","msg":"starting event loop..."}
 ```
+
 - `track_metrics` – should ulog track fallback metrics or not.
 
 > `usub::ulog::init(cfg);` initializes the global logger. Call it before any logging; otherwise the program may crash (e.g., segfault).
@@ -270,7 +278,9 @@ timeout = 5000
 port = 17000
 ssl  = false
 ```
+
 Now we need to pass path to config to `unet` instance:
+
 ```cpp
 auto config_path = "../../config.toml";
 usub::server::Server server(config_path);
@@ -279,6 +289,7 @@ usub::ulog::info("Server configured with TOML at: {}", config_path);
 
 ## Creating migration coroutine
 For migration, I decided to create an example without transactions because I decided to build UPQ use cases sequentially—from simple to more complex. Here is the code:
+
 ```cpp
 usub::uvent::task::Awaitable<void> migration_coroutine(usub::pg::PgConnector &connector) {
     usub::pg::RouteHint hint{.kind = usub::pg::QueryKind::Write,
@@ -341,7 +352,8 @@ usub::uvent::task::Awaitable<void> migration_coroutine(usub::pg::PgConnector &co
     }
 }
 ```
-I suspect that most readers are now beginning to wonder about what we have written. Let's take a closer look:
+
+Some readers can wonder about what we've written. Let's take a closer look:
 
 1. `usub::pg::RouteHint hint{...}; auto* pool = connector.route(hint);` selects a node (and its connection pool) for the query.
     - `hint.kind` describes the query type. `DDL` and `Write` are always routed to the primary node. `Read` may be routed to a replica, depending on consistency and health checks.
@@ -363,8 +375,12 @@ auto r = co_await pool.query_awaitable(R"SQL(
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   );
 )SQL");
-``` sends an SQL query to PostgreSQL. The coroutine writes the query to the socket, then suspends until the database responds. While suspended, it doesn’t busy-wait and doesn’t consume CPU, so the event loop thread can run other coroutines.
+```
+
+sends an SQL query to PostgreSQL. The coroutine writes the query to the socket, then suspends until the database responds. While suspended, it doesn’t busy-wait and doesn’t consume CPU, so the event loop thread can run other coroutines.
+
 4. 
+
 ```cpp
         if (!r.ok) {
             usub::ulog::error("PgQuery failed in: {}, code={} | sqlstate='{}' | message='{}'",
@@ -372,11 +388,15 @@ auto r = co_await pool.query_awaitable(R"SQL(
                               r.err_detail.sqlstate, r.err_detail.message);
             co_return;
         }
-``` responds for handling errors from database correctly. It'll provided detailed log of an error if it's returned by the database.
+```
+
+responds for handling errors from database correctly. It'll provided detailed log of an error if it's returned by the database.
 
 ## Creating connection pool
 Instead of simple example I decided to provided two variants of pool creation.
+
 ### Basic connection pool creation
+
 ```cpp
 usub::pg::PgPool pool(
     "localhost", // host
@@ -387,8 +407,11 @@ usub::pg::PgPool pool(
     32           // max pool size (max connections)
 );
 ```
+
 If all connections are busy, acquire will suspend the current coroutine until another coroutine returns a connection back to the pool.
+
 ### Advanced connection pool
+
 ```cpp
     usub::pg::PgConnector router_main =
             usub::pg::PgConnectorBuilder{}
@@ -444,6 +467,7 @@ If all connections are busy, acquire will suspend the current coroutine until an
 
 ## Starting migration and health-probe
 `uvent` provides method to spawn coroutines via `co_spawn`. To spawn migration-coroutine and health probe simply add two line of code under `router_main`:
+
 ```cpp
 int main() {
     usub::ulog::ULogInit cfg{
@@ -525,6 +549,7 @@ This config is for **cluster** usage. If your server runs in standalone mode, cl
 # First encounter with `unet`
 
 ## Probes
+
 ### /healthz
 
 In my opinion, the best example for getting acquainted with unet would be health-probe:
@@ -656,7 +681,9 @@ namespace article::handler {
     }
 }
 ```
+
 I've added some basic code to correctly handle requests on fault. Now we have come to the point where we need to create a DTO. First of all let's specify folder structure (tree log):
+
 ```
 .
 ├── CMakeLists.txt
@@ -681,6 +708,7 @@ I've added some basic code to correctly handle requests on fault. Now we have co
     │   └── UserHandler.cpp
     └── main.cpp
 ```
+
 Our DTOs will be stored in `include/api/dto`.
 - `include/api/dto/requests` — payloads you receive from clients (JSON → C++ struct)
 - `include/api/dto/responses` — payloads you send back (C++ struct → JSON).
