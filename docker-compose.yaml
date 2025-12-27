@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: local-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: devpass
+      POSTGRES_DB: devdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_local:/var/lib/postgresql/data
+
+  keydb:
+    image: eqalpha/keydb:latest
+    container_name: local-keydb
+    restart: unless-stopped
+    command: ["keydb-server", "/etc/keydb/keydb.conf"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - keydbdata_local:/data
+      - ./keydb.conf:/etc/keydb/keydb.conf:ro
+
+volumes:
+  pgdata_local:
+  keydbdata_local:
