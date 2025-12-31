@@ -57,6 +57,8 @@ add_executable(${PROJECT_NAME}
         include/api/dto/requests/Article.h
         include/api/dto/responses/User.h
         include/api/dto/responses/Article.h
+        include/utils/HttpError.h
+        include/utils/Hash.h
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE

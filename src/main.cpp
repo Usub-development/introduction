@@ -8,6 +8,7 @@
 #include <ulog/ulog.h>
 #include <uredis/RedisClusterClient.h>
 
+#include "handlers/UserHandler.h"
 #include "utils/LoggingUtils.h"
 
 usub::uvent::task::Awaitable<void> migration_coroutine(usub::pg::PgConnector &connector) {
@@ -25,27 +26,6 @@ usub::uvent::task::Awaitable<void> migration_coroutine(usub::pg::PgConnector &co
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
         CREATE UNIQUE INDEX IF NOT EXISTS ux_users_name ON public.users(name);
-        )SQL");
-        if (!r.ok) {
-            usub::ulog::error("PgQuery failed in: {}, code={} | sqlstate='{}' | message='{}'",
-                              make_location_string(), toString(r.code),
-                              r.err_detail.sqlstate, r.err_detail.message);
-            co_return;
-        }
-    } {
-        auto r = co_await pool->query_awaitable(R"SQL(
-        CREATE TABLE IF NOT EXISTS public.articles (
-          id BIGSERIAL PRIMARY KEY,
-          author_id BIGINT NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
-          title TEXT NOT NULL,
-          body TEXT NOT NULL,
-          status SMALLINT NOT NULL DEFAULT 0, -- 0=draft, 1=published, 2=archived
-          likes BIGINT NOT NULL DEFAULT 0,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-        );
-        CREATE INDEX IF NOT EXISTS idx_articles_author_time ON public.articles(author_id, created_at DESC);
-        CREATE INDEX IF NOT EXISTS idx_articles_status_time ON public.articles(status, created_at DESC);
         )SQL");
         if (!r.ok) {
             usub::ulog::error("PgQuery failed in: {}, code={} | sqlstate='{}' | message='{}'",
@@ -81,7 +61,7 @@ int main() {
 
     usub::ulog::init(cfg);
 
-    auto config_path = "../../config.toml";
+    auto config_path = "../config.toml";
     usub::server::Server server(config_path);
     usub::ulog::info("Server configured with TOML at: {}", config_path);
 
@@ -102,9 +82,10 @@ int main() {
 
     usub::uredis::RedisClusterConfig uredis_cfg;
     uredis_cfg.seeds = {{"127.0.0.1", 6379}};
+    uredis_cfg.password = "devpass";
 
     usub::uredis::RedisClusterClient uredis_client{uredis_cfg};
-
+    article::handler::UserHandler user_handler(router_main, uredis_client);
 
     server.handle("GET", "/healthz", [&](usub::server::protocols::http::Request &request,
                                          usub::server::protocols::http::Response &response
@@ -115,6 +96,17 @@ int main() {
                   });
 
     server.handle("GET", "/startup", startup_probe);
+    server
+    .handle("POST", R"(/api/user/create)",
+            bind_handler<&article::handler::UserHandler::createUser>(user_handler));
+    server
+    .handle("POST", R"(/api/user/update)",
+            bind_handler<&article::handler::UserHandler::updateUser>(user_handler));
+    server
+    .handle("POST", R"(/api/user/load)",
+            bind_handler<&article::handler::UserHandler::loadUser>(user_handler));
+
+    server.run();
 
     return 0;
 }

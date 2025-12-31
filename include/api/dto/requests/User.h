@@ -17,10 +17,26 @@ namespace article::dto {
         User, Admin
     };
 
-    struct User {
+    struct CreateUser {
         std::string name;
         std::string password;
         std::vector<Roles> roles;
+    };
+
+    struct UpdateUser {
+        std::string id;
+        std::string name;
+        std::string old_password;
+        std::string new_password;
+        std::vector<Roles> roles;
+    };
+
+    struct LoadUser {
+        std::string id;
+    };
+
+    struct DeleteUser {
+        std::string id;
     };
 }
 
@@ -37,6 +53,5 @@ struct usub::pg::detail::upq::enum_meta<article::dto::Roles> {
         User, Admin
     >();
 };
-
 
 #endif //ARTICLE_USER_REQUEST_H

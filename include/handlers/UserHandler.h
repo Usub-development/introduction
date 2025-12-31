@@ -9,11 +9,16 @@
 #include <ulog/ulog.h>
 #include "server/server.h"
 #include "utils/LoggingUtils.h"
+#include "utils/HttpError.h"
+#include "utils/Hash.h"
+#include "api/dto/requests/User.h"
+#include "api/dto/responses/User.h"
+#include <uredis/RedisClusterClient.h>
 
 namespace article::handler {
     class UserHandler {
     public:
-        UserHandler(usub::pg::PgConnector &connector);
+        UserHandler(usub::pg::PgConnector &connector, usub::uredis::RedisClusterClient& redis_cluster_client);
 
         ServerHandler createUser(usub::server::protocols::http::Request &request,
                                  usub::server::protocols::http::Response &response);
@@ -24,10 +29,9 @@ namespace article::handler {
         ServerHandler loadUser(usub::server::protocols::http::Request &request,
                                  usub::server::protocols::http::Response &response);
 
-        ServerHandler deleteUser(usub::server::protocols::http::Request &request,
-                                 usub::server::protocols::http::Response &response);
     private:
         usub::pg::PgConnector &connector_;
+        usub::uredis::RedisClusterClient& redis_cluster_client_;
     };
 }
 
